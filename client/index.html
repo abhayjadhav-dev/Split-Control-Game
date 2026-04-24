@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Split Control Obby Car</title>
+    <link rel="icon" type="image/svg+xml" href="/client/favicon.svg" />
+    <link rel="stylesheet" href="/client/styles.css" />
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game-canvas"></canvas>
+
+      <div id="hud">
+        <header class="panel topbar">
+          <div class="brand-block">
+            <p class="pill">LAN CO-OP</p>
+            <h1>Split Control Obby</h1>
+            <p id="status-text" aria-live="polite">Connecting to server...</p>
+          </div>
+ 
+          <section class="runtime-stats" aria-label="Round stats">
+            <div class="stat-chip">
+              <span>Timer</span>
+              <strong id="timer-value">00:00.000</strong>
+            </div>
+            <div class="stat-chip">
+              <span>Best</span>
+              <strong id="best-value">--</strong>
+            </div>
+            <div class="stat-chip">
+              <span>Coins</span>
+              <strong id="coins-value">0/0</strong>
+            </div>
+            <div class="stat-chip">
+              <span>Score</span>
+              <strong id="score-value">0</strong>
+            </div>
+          </section>
+
+          <div class="session-block">
+            <div class="role-pill">
+              <span>Role</span>
+              <strong id="role-badge">spectator</strong>
+            </div>
+            <p class="pill connection-pill" id="connection-chip">connecting</p>
+            <button id="details-toggle" type="button" aria-expanded="false">Menu</button>
+          </div>
+        </header>
+
+        <aside class="panel details-panel" id="details-panel" data-open="false">
+          <div class="details-head">
+            <h2>Team Details</h2>
+            <button id="details-close" type="button" aria-label="Close panel">Close</button>
+          </div>
+
+          <p id="control-help">Waiting for role assignment.</p>
+
+          <section class="team-slots" aria-label="Player slots">
+            <div class="team-row">
+              <span>Driver</span>
+              <strong id="driver-slot">waiting</strong>
+            </div>
+            <div class="team-row">
+              <span>Steerer</span>
+              <strong id="steerer-slot">waiting</strong>
+            </div>
+          </section>
+
+          <button id="restart-button" type="button">Restart Round (R)</button>
+          <p class="details-tip">Tip: press M to toggle this panel.</p>
+        </aside>
+
+        <section class="panel panel-mobile" id="mobile-controls" aria-label="Mobile controls">
+          <div class="mobile-group">
+            <button data-action="left" type="button">Left</button>
+            <button data-action="right" type="button">Right</button>
+          </div>
+          <div class="mobile-group">
+            <button data-action="throttle" type="button">Throttle</button>
+            <button data-action="brake" type="button">Brake</button>
+          </div>
+        </section>
+
+        <div id="event-banner" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <script type="module" src="/client/src/main.js"></script>
+  </body>
+</html>
