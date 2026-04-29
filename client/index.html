@@ -2,11 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#0d0b2e" />
     <title>Split Control Obby Car</title>
     <link rel="icon" type="image/svg+xml" href="/client/favicon.svg" />
     <link rel="stylesheet" href="/client/styles.css" />
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   </head>
   <body>
     <div id="app">
@@ -68,18 +73,29 @@
             </div>
           </section>
 
-          <button id="restart-button" type="button">Restart Round (R)</button>
+          <div style="text-align: center; margin-top: 15px;">
+            <p style="margin-bottom: 5px; font-size: 0.78rem; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.1em;">Scan to join</p>
+            <canvas id="qr-code" style="border-radius: 8px; background: white; padding: 4px;"></canvas>
+          </div>
+
+          <section id="player-list-section" style="margin-top: 12px;">
+            <p style="font-size: 0.72rem; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 6px;">Connected Players</p>
+            <div id="player-list"></div>
+          </section>
+
+          <button id="restart-button" type="button" style="margin-top: 12px; width: 100%;">Restart Round (R)</button>
+          <button id="solo-button" type="button" style="margin-top: 8px; width: 100%;">Toggle Solo Mode (T)</button>
           <p class="details-tip">Tip: press M to toggle this panel.</p>
         </aside>
 
-        <section class="panel panel-mobile" id="mobile-controls" aria-label="Mobile controls">
-          <div class="mobile-group">
-            <button data-action="left" type="button">Left</button>
-            <button data-action="right" type="button">Right</button>
+        <section class="panel-mobile" id="mobile-controls" aria-label="Mobile controls">
+          <div class="mobile-group-left">
+            <button class="mobile-btn" data-action="left" type="button">◀</button>
+            <button class="mobile-btn" data-action="right" type="button">▶</button>
           </div>
-          <div class="mobile-group">
-            <button data-action="throttle" type="button">Throttle</button>
-            <button data-action="brake" type="button">Brake</button>
+          <div class="mobile-group-right">
+            <button class="mobile-btn mobile-btn-primary" data-action="throttle" type="button">GO</button>
+            <button class="mobile-btn mobile-btn-secondary" data-action="brake" type="button">BRK</button>
           </div>
         </section>
 

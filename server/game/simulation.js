@@ -167,7 +167,9 @@ export class GameSimulation {
   assignRole(socketId) {
     let role = "spectator";
 
-    if (!this.roleSlots.driver) {
+    if (this.roleSlots.driver === this.roleSlots.steerer && this.roleSlots.driver !== null) {
+      role = "spectator";
+    } else if (!this.roleSlots.driver) {
       this.roleSlots.driver = socketId;
       role = "driver";
       this.inputs.driver.throttle = false;
@@ -249,13 +251,36 @@ export class GameSimulation {
     return this.rebalanceRoles();
   }
 
+  toggleSoloMode(socketId) {
+    const player = this.players.get(socketId);
+    if (!player) return [];
+
+    if (player.role !== "solo") {
+      for (const [id, p] of this.players.entries()) {
+        if (id !== socketId && p.role !== "spectator") {
+          p.role = "spectator";
+        }
+      }
+      this.roleSlots.driver = socketId;
+      this.roleSlots.steerer = socketId;
+      player.role = "solo";
+      return Array.from(this.players.entries()).map(([id, p]) => ({ socketId: id, role: p.role }));
+    } else {
+      player.role = "spectator";
+      this.roleSlots.driver = null;
+      this.roleSlots.steerer = null;
+      const promotions = this.rebalanceRoles();
+      return [{ socketId, role: "spectator" }, ...promotions];
+    }
+  }
+
   getPlayerRole(socketId) {
     return this.players.get(socketId)?.role || "spectator";
   }
 
   requestManualRestart(socketId, nowMs = Date.now()) {
     const role = this.getPlayerRole(socketId);
-    if (role !== "driver" && role !== "steerer") {
+    if (role !== "driver" && role !== "steerer" && role !== "solo") {
       return {
         accepted: false,
         reason: "role-required",
@@ -284,7 +309,7 @@ export class GameSimulation {
 
   setDriveInput(socketId, payload) {
     const player = this.players.get(socketId);
-    if (!player || player.role !== "driver") {
+    if (!player || (player.role !== "driver" && player.role !== "solo")) {
       return;
     }
 
@@ -295,13 +320,63 @@ export class GameSimulation {
 
   setSteerInput(socketId, payload) {
     const player = this.players.get(socketId);
-    if (!player || player.role !== "steerer") {
+    if (!player || (player.role !== "steerer" && player.role !== "solo")) {
       return;
     }
 
     this.inputs.steerer.left = payload?.left === true;
     this.inputs.steerer.right = payload?.right === true;
     this.lastInputAtMs.steerer = Date.now();
+  }
+
+  setSoloInput(socketId, payload) {
+    const player = this.players.get(socketId);
+    if (!player || player.role !== "solo") {
+      return;
+    }
+
+    this.inputs.driver.throttle = payload?.throttle === true;
+    this.inputs.driver.brake = payload?.brake === true;
+    this.inputs.steerer.left = payload?.left === true;
+    this.inputs.steerer.right = payload?.right === true;
+    this.lastInputAtMs.driver = Date.now();
+    this.lastInputAtMs.steerer = Date.now();
+  }
+
+  kickPlayer(requesterId, targetSocketId) {
+    const requester = this.players.get(requesterId);
+    if (!requester) {
+      return { accepted: false, message: "You are not in the session." };
+    }
+
+    // Only the first connected player (host) or a driver/steerer/solo can kick
+    const requesterRole = requester.role;
+    if (requesterRole === "spectator") {
+      return { accepted: false, message: "Only active players can kick others." };
+    }
+
+    if (requesterId === targetSocketId) {
+      return { accepted: false, message: "You cannot kick yourself." };
+    }
+
+    const target = this.players.get(targetSocketId);
+    if (!target) {
+      return { accepted: false, message: "Player not found." };
+    }
+
+    return { accepted: true, targetSocketId };
+  }
+
+  getPlayerList() {
+    const list = [];
+    for (const [socketId, player] of this.players.entries()) {
+      list.push({
+        socketId,
+        shortId: toShortId(socketId),
+        role: player.role,
+      });
+    }
+    return list;
   }
 
   resetRound(reason = "manual") {

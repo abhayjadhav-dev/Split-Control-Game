@@ -48,6 +48,7 @@ io.on("connection", (socket) => {
   });
 
   io.emit("roles", simulation.getRoleSnapshot());
+  io.emit("players", simulation.getPlayerList());
 
   socket.on("input:drive", (payload) => {
     simulation.setDriveInput(socket.id, payload);
@@ -55,6 +56,54 @@ io.on("connection", (socket) => {
 
   socket.on("input:steer", (payload) => {
     simulation.setSteerInput(socket.id, payload);
+  });
+
+  socket.on("input:solo", (payload) => {
+    simulation.setSoloInput(socket.id, payload);
+  });
+
+  socket.on("request:solo", () => {
+    const roleUpdates = simulation.toggleSoloMode(socket.id);
+    for (const update of roleUpdates) {
+      io.to(update.socketId).emit("role:update", { role: update.role });
+    }
+    io.emit("roles", simulation.getRoleSnapshot());
+    io.emit("players", simulation.getPlayerList());
+  });
+
+  socket.on("request:kick", (payload) => {
+    const targetSocketId = payload?.targetSocketId;
+    if (!targetSocketId) return;
+
+    const result = simulation.kickPlayer(socket.id, targetSocketId);
+    if (!result.accepted) {
+      io.to(socket.id).emit("round:event", {
+        type: "notice",
+        message: result.message,
+      });
+      return;
+    }
+
+    // Notify the kicked player
+    io.to(targetSocketId).emit("player:kicked");
+
+    // Force disconnect the kicked player
+    const targetSocket = io.sockets.sockets.get(targetSocketId);
+    if (targetSocket) {
+      const promotions = simulation.removePlayer(targetSocketId);
+      targetSocket.disconnect(true);
+
+      for (const promotion of promotions) {
+        io.to(promotion.socketId).emit("role:update", { role: promotion.role });
+      }
+
+      io.emit("roles", simulation.getRoleSnapshot());
+      io.emit("players", simulation.getPlayerList());
+      io.emit("round:event", {
+        type: "notice",
+        message: "A player was removed from the session.",
+      });
+    }
   });
 
   socket.on("request:restart", () => {
@@ -86,6 +135,7 @@ io.on("connection", (socket) => {
     }
 
     io.emit("roles", simulation.getRoleSnapshot());
+    io.emit("players", simulation.getPlayerList());
   });
 });
 

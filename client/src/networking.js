@@ -52,6 +52,14 @@ export function createNetworkClient(handlers = {}) {
     socket.on("round:event", (payload) => {
       handlers.onRoundEvent?.(payload);
     });
+
+    socket.on("player:kicked", () => {
+      handlers.onKicked?.();
+    });
+
+    socket.on("players", (payload) => {
+      handlers.onPlayers?.(payload);
+    });
   }
 
   function sendInput(role, payload) {
@@ -66,6 +74,12 @@ export function createNetworkClient(handlers = {}) {
 
     if (role === "steerer") {
       socket.volatile.emit("input:steer", payload);
+      return;
+    }
+
+    if (role === "solo") {
+      // Send as reliable emit (not volatile) to avoid dropped steer packets
+      socket.emit("input:solo", payload);
     }
   }
 
@@ -75,6 +89,20 @@ export function createNetworkClient(handlers = {}) {
     }
 
     socket.emit("request:restart");
+  }
+
+  function requestSolo() {
+    if (!socket || !socket.connected) {
+      return;
+    }
+    socket.emit("request:solo");
+  }
+
+  function requestKick(targetSocketId) {
+    if (!socket || !socket.connected) {
+      return;
+    }
+    socket.emit("request:kick", { targetSocketId });
   }
 
   function disconnect() {
@@ -91,6 +119,8 @@ export function createNetworkClient(handlers = {}) {
     connect,
     sendInput,
     requestRestart,
+    requestSolo,
+    requestKick,
     disconnect,
     isConnected,
   };

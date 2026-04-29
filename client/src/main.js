@@ -14,6 +14,10 @@ function roleStatus(role) {
     return "Role locked: Steerer. Control left and right steering.";
   }
 
+  if (role === "solo") {
+    return "Solo Mode: You control both speed (W/S) and steering (A/D).";
+  }
+
   return "Spectating. Join from another device to get control when a slot frees up.";
 }
 
@@ -45,7 +49,7 @@ function eventStatus(event, formatTime) {
     }
 
     if (event.reason === "manual-restart" && event.by) {
-      const by = event.by === "driver" ? "Driver" : "Steerer";
+      const by = event.by === "driver" ? "Driver" : event.by === "solo" ? "Solo" : "Steerer";
       return `${by} restarted the round.`;
     }
 
@@ -93,6 +97,14 @@ hud.bindRestart(() => {
   networkClient?.requestRestart();
 });
 
+hud.bindSolo(() => {
+  networkClient?.requestSolo();
+});
+
+hud.bindKick((targetSocketId) => {
+  networkClient?.requestKick(targetSocketId);
+});
+
 hud.bindMobileControls((action, isPressed) => {
   input.setVirtualControl(action, isPressed);
 });
@@ -118,6 +130,7 @@ networkClient = createNetworkClient({
     latestState = payload.state || latestState;
     input.forceResend();
 
+    hud.setMySocketId(payload.socketId);
     hud.setRole(role);
     refreshBaseStatus();
 
@@ -178,6 +191,17 @@ networkClient = createNetworkClient({
 
   onReconnected: () => {
     hud.showEventBanner("Reconnected. Syncing session...", 1600);
+  },
+
+  onKicked: () => {
+    hud.showEventBanner("You have been removed from the session.", 4000);
+    role = "spectator";
+    hud.setRole(role);
+    input.clearActiveControls();
+  },
+
+  onPlayers: (players) => {
+    hud.setPlayers(players);
   },
 });
 

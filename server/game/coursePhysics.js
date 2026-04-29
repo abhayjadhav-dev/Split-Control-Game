@@ -1,4 +1,4 @@
-wwimport { COURSE_LAYOUT } from "../../scripts/courseLayout.js";
+import { COURSE_LAYOUT } from "../../scripts/courseLayout.js";
 
 function normalizeAxis(axis = [1, 0, 0]) {
   const x = Number(axis[0] || 0);

@@ -24,6 +24,10 @@ function roleDescription(role) {
     return "Steerer controls direction: A/Left and D/Right.";
   }
 
+  if (role === "solo") {
+    return "Solo Mode: You control both speed and direction.";
+  }
+
   return "Spectator mode. Join from another device to take an open role.";
 }
 
@@ -45,6 +49,7 @@ function isEditableTarget(target) {
 const ROLE_ACTIONS = {
   driver: new Set(["throttle", "brake"]),
   steerer: new Set(["left", "right"]),
+  solo: new Set(["throttle", "brake", "left", "right"]),
   spectator: new Set(),
 };
 
@@ -60,11 +65,25 @@ export function createHud() {
   const steererSlot = document.querySelector("#steerer-slot");
   const controlHelp = document.querySelector("#control-help");
   const restartButton = document.querySelector("#restart-button");
+  const soloButton = document.querySelector("#solo-button");
   const detailsPanel = document.querySelector("#details-panel");
   const detailsToggle = document.querySelector("#details-toggle");
   const detailsClose = document.querySelector("#details-close");
   const eventBanner = document.querySelector("#event-banner");
   const mobileButtons = Array.from(document.querySelectorAll("#mobile-controls button"));
+  const qrCanvas = document.querySelector("#qr-code");
+  const playerListContainer = document.querySelector("#player-list");
+
+  if (window.QRCode && qrCanvas) {
+    window.QRCode.toCanvas(qrCanvas, window.location.href, {
+      width: 140,
+      margin: 1,
+      color: {
+        dark: "#09111a",
+        light: "#ffffff"
+      }
+    }).catch(console.error);
+  }
 
   let currentRole = "spectator";
   let isConnected = false;
@@ -72,6 +91,8 @@ export function createHud() {
   let detailsOpen = false;
   let mobileControlHandler = null;
   let bannerTimeout = null;
+  let kickHandler = null;
+  let mySocketId = null;
 
   const activeMobileActions = new Set();
 
@@ -149,6 +170,9 @@ export function createHud() {
     const canRestart = isConnected && currentRole !== "spectator";
     restartButton.disabled = !canRestart;
     restartButton.classList.toggle("inactive", !canRestart);
+
+    soloButton.disabled = !isConnected;
+    soloButton.classList.toggle("inactive", !isConnected);
   }
 
   function setStatusText(message) {
@@ -209,9 +233,71 @@ export function createHud() {
       if (restartButton.disabled) {
         return;
       }
-
       handler();
     });
+  }
+
+  function bindSolo(handler) {
+    soloButton.addEventListener("click", () => {
+      if (soloButton.disabled) return;
+      handler();
+    });
+  }
+
+  function bindKick(handler) {
+    kickHandler = handler;
+  }
+
+  function setMySocketId(id) {
+    mySocketId = id;
+  }
+
+  function setPlayers(players) {
+    if (!playerListContainer) return;
+    playerListContainer.innerHTML = "";
+
+    if (!players || players.length === 0) {
+      playerListContainer.innerHTML = '<p style="color: var(--text-soft); font-size: 0.82rem;">No players connected.</p>';
+      return;
+    }
+
+    for (const player of players) {
+      const row = document.createElement("div");
+      row.className = "team-row";
+      row.style.marginBottom = "4px";
+
+      const isMe = player.socketId === mySocketId;
+      const roleColors = {
+        driver: "var(--accent-cyan)",
+        steerer: "var(--accent-gold)",
+        solo: "var(--accent-purple)",
+        spectator: "var(--text-soft)",
+      };
+
+      const label = document.createElement("span");
+      label.style.color = roleColors[player.role] || "var(--text-soft)";
+      label.textContent = `${player.shortId} ${isMe ? "(you)" : ""}`;
+
+      const roleSpan = document.createElement("strong");
+      roleSpan.textContent = player.role;
+      roleSpan.style.color = roleColors[player.role] || "#e8edff";
+
+      row.appendChild(label);
+      row.appendChild(roleSpan);
+
+      if (!isMe && currentRole !== "spectator" && kickHandler) {
+        const kickBtn = document.createElement("button");
+        kickBtn.textContent = "✕";
+        kickBtn.title = "Kick player";
+        kickBtn.style.cssText = "padding: 3px 8px; font-size: 0.7rem; min-width: 0; margin-left: 6px; border-radius: 6px; background: rgba(255,80,80,0.6); border: 1px solid rgba(255,80,80,0.8); color: #fff;";
+        kickBtn.addEventListener("click", () => {
+          kickHandler(player.socketId);
+        });
+        row.appendChild(kickBtn);
+      }
+
+      playerListContainer.appendChild(row);
+    }
   }
 
   function bindMobileControls(handler) {
@@ -241,8 +327,16 @@ export function createHud() {
     for (const button of mobileButtons) {
       const action = button.dataset.action;
 
+      // Prevent ALL default touch behaviors (copy, select, magnifier)
+      button.addEventListener("touchstart", (e) => { e.preventDefault(); e.stopPropagation(); }, { passive: false });
+      button.addEventListener("touchmove", (e) => { e.preventDefault(); e.stopPropagation(); }, { passive: false });
+      button.addEventListener("touchend", (e) => { e.preventDefault(); e.stopPropagation(); }, { passive: false });
+      button.addEventListener("contextmenu", (e) => { e.preventDefault(); e.stopPropagation(); });
+      button.addEventListener("selectstart", (e) => { e.preventDefault(); });
+
       const press = (event) => {
         event.preventDefault();
+        event.stopPropagation();
 
         if (typeof button.setPointerCapture === "function" && event.pointerId != null) {
           try {
@@ -257,6 +351,7 @@ export function createHud() {
 
       const release = (event) => {
         event.preventDefault();
+        event.stopPropagation();
         setPressed(button, action, false);
       };
 
@@ -265,7 +360,6 @@ export function createHud() {
       button.addEventListener("pointerleave", release);
       button.addEventListener("pointercancel", release);
       button.addEventListener("lostpointercapture", release);
-      button.addEventListener("contextmenu", (event) => event.preventDefault());
     }
   }
 
@@ -304,6 +398,12 @@ export function createHud() {
       return;
     }
 
+    if (event.code === "KeyT" && !soloButton.disabled) {
+      event.preventDefault();
+      soloButton.click();
+      return;
+    }
+
     if (event.code === "Escape" && detailsOpen) {
       event.preventDefault();
       setDetailsOpen(false);
@@ -336,8 +436,12 @@ export function createHud() {
     setRound,
     setRoles,
     bindRestart,
+    bindSolo,
+    bindKick,
     bindMobileControls,
     setConnectionState,
+    setMySocketId,
+    setPlayers,
     formatTimeMs,
     destroy,
   };

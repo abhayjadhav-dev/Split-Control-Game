@@ -29,8 +29,7 @@ function isEditableTarget(target) {
     target.isContentEditable ||
     tag === "INPUT" ||
     tag === "TEXTAREA" ||
-    tag === "SELECT" ||
-    tag === "BUTTON"
+    tag === "SELECT"
   );
 }
 
@@ -41,10 +40,12 @@ export function createInputController({ onRestart }) {
   const lastSentByRole = {
     driver: null,
     steerer: null,
+    solo: null,
   };
   const lastSentAtByRole = {
     driver: 0,
     steerer: 0,
+    solo: 0,
   };
 
   function recomputeCombinedState() {
@@ -128,8 +129,10 @@ export function createInputController({ onRestart }) {
   function forceResend() {
     lastSentByRole.driver = null;
     lastSentByRole.steerer = null;
+    lastSentByRole.solo = null;
     lastSentAtByRole.driver = 0;
     lastSentAtByRole.steerer = 0;
+    lastSentAtByRole.solo = 0;
   }
 
   function buildPacket(role) {
@@ -149,19 +152,29 @@ export function createInputController({ onRestart }) {
       };
     }
 
+    if (role === "solo") {
+      payload = {
+        throttle: combinedState.throttle,
+        brake: combinedState.brake,
+        left: combinedState.left,
+        right: combinedState.right,
+      };
+    }
+
     if (!payload) {
       return null;
     }
 
     const signature = JSON.stringify(payload);
     const now = performance.now();
-    const stale = now - lastSentAtByRole[role] >= NETWORK_CONFIG.inputKeepAliveMs;
-    if (lastSentByRole[role] === signature && !stale) {
+    const roleKey = role === "solo" ? "solo" : role;
+    const stale = now - (lastSentAtByRole[roleKey] || 0) >= NETWORK_CONFIG.inputKeepAliveMs;
+    if (lastSentByRole[roleKey] === signature && !stale) {
       return null;
     }
 
-    lastSentByRole[role] = signature;
-    lastSentAtByRole[role] = now;
+    lastSentByRole[roleKey] = signature;
+    lastSentAtByRole[roleKey] = now;
     return payload;
   }
 

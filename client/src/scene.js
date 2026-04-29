@@ -44,37 +44,79 @@ function createSeededRandom(seedValue = 1) {
   };
 }
 
-function colorForTrackSegment(id, fallback = "#647f94") {
+function colorForTrackSegment(id, fallback = "#3d6d8f") {
   if (!id) {
     return fallback;
   }
 
+  // Start zone (Green/Teal)
   if (id.includes("start")) {
-    return "#3f9a74";
+    return "#2d9e6e";
   }
 
+  // Finish zone (Bright Green/Gold)
   if (id.includes("finish")) {
-    return "#77ab62";
+    return "#4aaa55";
   }
 
+  // Checkpoints (Bright Cyan)
   if (id.includes("checkpoint")) {
-    return "#8caed0";
+    return "#4a9fd0";
   }
 
-  if (id.includes("spinner")) {
-    return "#617961";
+  // Spinner arena (Deep Green)
+  if (id.includes("spinner") || id.includes("arena")) {
+    return "#3a6a4a";
   }
 
-  if (id.includes("mover")) {
-    return "#5f7a8e";
+  // Mover/Runway (Steel Purple)
+  if (id.includes("mover") || id.includes("runway")) {
+    return "#4a5e80";
   }
 
-  if (id.includes("narrow") || id.includes("split") || id.includes("zig")) {
-    return "#556f8a";
+  // Narrow/Bridge (Deep Blue)
+  if (id.includes("narrow") || id.includes("bridge")) {
+    return "#2e5a7f";
   }
 
+  // Split paths (Teal)
+  if (id.includes("split")) {
+    return "#2a7a7a";
+  }
+
+  // Zigzag (Indigo)
+  if (id.includes("zig")) {
+    return "#4860a0";
+  }
+
+  // Chicane (Steel Blue)
+  if (id.includes("chicane")) {
+    return "#3d6d8f";
+  }
+
+  // Final lane
+  if (id.includes("final")) {
+    return "#4a8050";
+  }
+
+  // Merge
+  if (id.includes("merge")) {
+    return "#4a8a6a";
+  }
+
+  // Guardrails and decorative edges
+  if (id.includes("rail") || id.includes("deco") || id.includes("mark")) {
+    return fallback;
+  }
+
+  // Seam plates
   if (id.includes("seam")) {
-    return "#607688";
+    return fallback;
+  }
+
+  // Launch lane
+  if (id.includes("launch")) {
+    return "#3a7e8a";
   }
 
   return fallback;
@@ -82,18 +124,31 @@ function colorForTrackSegment(id, fallback = "#647f94") {
 
 function strokeForTrackSegment(id) {
   if (!id) {
-    return "rgba(236, 247, 255, 0.16)";
+    return "rgba(180, 220, 255, 0.18)";
   }
 
   if (id.includes("finish")) {
-    return "rgba(255, 244, 197, 0.4)";
+    return "rgba(255, 240, 160, 0.45)";
   }
 
   if (id.includes("checkpoint")) {
-    return "rgba(228, 242, 255, 0.28)";
+    return "rgba(100, 200, 255, 0.35)";
   }
 
-  return "rgba(220, 240, 255, 0.19)";
+  if (id.includes("start")) {
+    return "rgba(100, 255, 180, 0.3)";
+  }
+
+  if (id.includes("rail") || id.includes("deco") || id.includes("mark")) {
+    return "rgba(160, 200, 240, 0.25)";
+  }
+
+  return "rgba(160, 210, 255, 0.2)";
+}
+
+function isGuardrail(id) {
+  if (!id) return false;
+  return id.includes("rail") || id.includes("deco") || id.includes("mark");
 }
 
 function offsetByLocal(x, z, angle, localX, localZ) {
@@ -110,19 +165,25 @@ function rectFromDescriptor(descriptor) {
   const position = descriptor.position || descriptor.basePosition || descriptor.center;
   const rotation = descriptor.rotation || [0, 0, 0];
   const id = descriptor.id || "";
-  const fill = colorForTrackSegment(id, descriptor.color || "#647f94");
+  const fill = colorForTrackSegment(id, descriptor.color || "#3d6d8f");
   const stroke = strokeForTrackSegment(id);
+  const guardrail = isGuardrail(id);
   const hazard =
-    id.includes("narrow") ||
-    id.includes("mover") ||
-    id.includes("spinner") ||
-    id.includes("zig") ||
-    id.includes("final");
+    !guardrail && (
+      id.includes("narrow") ||
+      id.includes("mover") ||
+      id.includes("spinner") ||
+      id.includes("zig") ||
+      id.includes("final") ||
+      id.includes("bridge")
+    );
   const flowLane =
-    id.includes("lane") ||
-    id.includes("runway") ||
-    id.includes("checkpoint") ||
-    id.includes("finish");
+    !guardrail && (
+      id.includes("lane") ||
+      id.includes("runway") ||
+      id.includes("checkpoint") ||
+      id.includes("finish")
+    );
 
   return {
     id,
@@ -135,6 +196,7 @@ function rectFromDescriptor(descriptor) {
     stroke,
     hazard,
     flowLane,
+    guardrail,
   };
 }
 
@@ -224,15 +286,19 @@ export function createGameScene({ canvas, courseLayout }) {
   const dotCount = Math.round(115 * qualityScale);
 
   for (let index = 0; index < blobCount; index += 1) {
-    const useWarmColor = seededRandom() > 0.56;
+    const colorRoll = seededRandom();
+    let blobColor;
+    if (colorRoll > 0.66) blobColor = [176, 136, 249]; // purple
+    else if (colorRoll > 0.33) blobColor = [100, 216, 255]; // cyan
+    else blobColor = [255, 140, 76]; // warm orange
     nebulaBlobs.push({
       x: (seededRandom() * 2 - 1) * 360,
       z: -360 + seededRandom() * 560,
       radius: 60 + seededRandom() * 170,
       phase: seededRandom() * Math.PI * 2,
       drift: (seededRandom() * 2 - 1) * 0.14,
-      color: useWarmColor ? [255, 161, 96] : [98, 182, 255],
-      alpha: 0.05 + seededRandom() * 0.11,
+      color: blobColor,
+      alpha: 0.06 + seededRandom() * 0.13,
       parallax: 0.12 + seededRandom() * 0.23,
     });
   }
@@ -279,6 +345,16 @@ export function createGameScene({ canvas, courseLayout }) {
     });
   }
 
+  const carParticles = [];
+  const carTrail = [];
+  let screenShakeAmount = 0;
+  let shakeOffsetX = 0;
+  let shakeOffsetY = 0;
+
+  // Shooting stars
+  const shootingStars = [];
+  const maxShootingStars = Math.round(6 * qualityScale);
+
   const coinStates = new Map();
   for (const [id, descriptor] of coinDescriptors.entries()) {
     coinStates.set(id, {
@@ -300,15 +376,15 @@ export function createGameScene({ canvas, courseLayout }) {
 
   function worldToScreen(x, z) {
     return {
-      x: (x - camera.x) * camera.zoom + viewport.width * 0.5,
-      y: (z - camera.z) * camera.zoom + viewport.height * 0.57,
+      x: (x - camera.x) * camera.zoom + viewport.width * 0.5 + shakeOffsetX,
+      y: (z - camera.z) * camera.zoom + viewport.height * 0.57 + shakeOffsetY,
     };
   }
 
   function worldToParallaxScreen(x, z, parallax) {
     return {
-      x: (x - camera.x * parallax) * camera.zoom + viewport.width * 0.5,
-      y: (z - camera.z * parallax) * camera.zoom + viewport.height * 0.57,
+      x: (x - camera.x * parallax) * camera.zoom + viewport.width * 0.5 + shakeOffsetX,
+      y: (z - camera.z * parallax) * camera.zoom + viewport.height * 0.57 + shakeOffsetY,
     };
   }
 
@@ -331,13 +407,17 @@ export function createGameScene({ canvas, courseLayout }) {
 
   function drawBackground(timeMs) {
     const animatedTime = timeMs * motionScale;
-    const gradient = context.createLinearGradient(0, 0, 0, viewport.height);
-    gradient.addColorStop(0, "#061a2a");
-    gradient.addColorStop(0.5, "#0a2439");
-    gradient.addColorStop(1, "#081621");
+
+    // Vibrant gradient background
+    const gradient = context.createLinearGradient(0, 0, viewport.width * 0.3, viewport.height);
+    gradient.addColorStop(0, "#0d0b2e");
+    gradient.addColorStop(0.35, "#12103a");
+    gradient.addColorStop(0.6, "#0e1f3a");
+    gradient.addColorStop(1, "#081428");
     context.fillStyle = gradient;
     context.fillRect(0, 0, viewport.width, viewport.height);
 
+    // Nebula blobs
     for (const blob of nebulaBlobs) {
       const position = worldToParallaxScreen(blob.x, blob.z, blob.parallax);
       const driftX = Math.sin(animatedTime * 0.00032 + blob.phase) * 18 * motionScale;
@@ -373,6 +453,7 @@ export function createGameScene({ canvas, courseLayout }) {
       context.fill();
     }
 
+    // Stars
     for (const dot of sparkleDots) {
       const position = worldToParallaxScreen(dot.x, dot.z, dot.parallax);
       if (
@@ -385,19 +466,62 @@ export function createGameScene({ canvas, courseLayout }) {
       }
 
       const twinkle = 0.68 + 0.32 * Math.sin(animatedTime * 0.0012 + dot.x * 0.06 + dot.z * 0.03);
-      context.fillStyle = `rgba(183, 225, 255, ${(dot.alpha * twinkle).toFixed(3)})`;
+      context.fillStyle = `rgba(200, 210, 255, ${(dot.alpha * twinkle).toFixed(3)})`;
       context.beginPath();
       context.arc(position.x, position.y, dot.radius, 0, Math.PI * 2);
       context.fill();
     }
 
+    // Shooting stars
+    const dtSec = 0.016;
+    if (shootingStars.length < maxShootingStars && Math.random() < 0.008 * motionScale) {
+      const angle = 0.6 + Math.random() * 0.4;
+      shootingStars.push({
+        x: Math.random() * viewport.width * 1.2 - viewport.width * 0.1,
+        y: -20 - Math.random() * 60,
+        vx: Math.cos(angle) * (250 + Math.random() * 200),
+        vy: Math.sin(angle) * (250 + Math.random() * 200),
+        life: 0.5 + Math.random() * 0.6,
+        maxLife: 0.5 + Math.random() * 0.6,
+        length: 25 + Math.random() * 40,
+      });
+    }
+    for (let i = shootingStars.length - 1; i >= 0; i--) {
+      const star = shootingStars[i];
+      star.life -= dtSec;
+      if (star.life <= 0 || star.y > viewport.height + 40) {
+        shootingStars.splice(i, 1);
+        continue;
+      }
+      star.x += star.vx * dtSec;
+      star.y += star.vy * dtSec;
+
+      const alpha = Math.max(0, star.life / star.maxLife);
+      const speed = Math.hypot(star.vx, star.vy);
+      const tailX = star.x - (star.vx / speed) * star.length;
+      const tailY = star.y - (star.vy / speed) * star.length;
+
+      const starGrad = context.createLinearGradient(star.x, star.y, tailX, tailY);
+      starGrad.addColorStop(0, `rgba(255, 255, 255, ${(alpha * 0.9).toFixed(3)})`);
+      starGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+      context.strokeStyle = starGrad;
+      context.lineWidth = 1.8;
+      context.lineCap = "round";
+      context.beginPath();
+      context.moveTo(star.x, star.y);
+      context.lineTo(tailX, tailY);
+      context.stroke();
+    }
+
+    // Grid
     const worldStep = 12;
     const leftWorld = camera.x - viewport.width / (2 * camera.zoom) - worldStep;
     const rightWorld = camera.x + viewport.width / (2 * camera.zoom) + worldStep;
     const topWorld = camera.z - viewport.height / (2 * camera.zoom) - worldStep;
     const bottomWorld = camera.z + viewport.height / (2 * camera.zoom) + worldStep;
 
-    context.strokeStyle = "rgba(136, 197, 227, 0.08)";
+    context.strokeStyle = "rgba(120, 140, 200, 0.06)";
     context.lineWidth = 1;
 
     const startX = Math.floor(leftWorld / worldStep) * worldStep;
@@ -420,16 +544,17 @@ export function createGameScene({ canvas, courseLayout }) {
       context.stroke();
     }
 
+    // Vignette
     const vignette = context.createRadialGradient(
       viewport.width * 0.5,
       viewport.height * 0.5,
-      viewport.height * 0.2,
+      viewport.height * 0.18,
       viewport.width * 0.5,
       viewport.height * 0.5,
-      viewport.height * 0.78
+      viewport.height * 0.82
     );
     vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
-    vignette.addColorStop(1, "rgba(0, 0, 0, 0.36)");
+    vignette.addColorStop(1, "rgba(0, 0, 0, 0.4)");
     context.fillStyle = vignette;
     context.fillRect(0, 0, viewport.width, viewport.height);
   }
@@ -455,13 +580,48 @@ export function createGameScene({ canvas, courseLayout }) {
     }
 
     context.fillStyle = options.fill || rect.fill || rect.color;
-    context.fillRect(-widthPx * 0.5, -heightPx * 0.5, widthPx, heightPx);
+    context.beginPath();
+    roundedRectPath(context, -widthPx * 0.5, -heightPx * 0.5, widthPx, heightPx, options.radius || 2);
+    context.fill();
 
     if (options.stroke) {
       context.strokeStyle = options.stroke;
       context.lineWidth = options.lineWidth || 1.1;
       context.strokeRect(-widthPx * 0.5, -heightPx * 0.5, widthPx, heightPx);
     }
+
+    // Edge glow effect for road segments
+    if (options.edgeGlow) {
+      const glowAlpha = options.edgeGlowAlpha || 0.15;
+      const glowWidth = Math.max(2, widthPx * 0.06);
+      context.strokeStyle = options.edgeGlow;
+      context.lineWidth = glowWidth;
+      context.globalAlpha = glowAlpha;
+      context.strokeRect(-widthPx * 0.5, -heightPx * 0.5, widthPx, heightPx);
+      context.globalAlpha = 1;
+    }
+
+    context.restore();
+  }
+
+  function drawRoadSurface(segment) {
+    const center = worldToScreen(segment.x, segment.z);
+    const widthPx = segment.width * camera.zoom;
+    const heightPx = segment.height * camera.zoom;
+    const angle = segment.angle || 0;
+
+    context.save();
+    context.translate(center.x, center.y);
+    context.rotate(angle);
+
+    // Subtle surface gradient for 3D depth feel
+    const surfGrad = context.createLinearGradient(-widthPx * 0.5, 0, widthPx * 0.5, 0);
+    surfGrad.addColorStop(0, "rgba(255, 255, 255, 0.04)");
+    surfGrad.addColorStop(0.3, "rgba(255, 255, 255, 0.0)");
+    surfGrad.addColorStop(0.7, "rgba(255, 255, 255, 0.0)");
+    surfGrad.addColorStop(1, "rgba(0, 0, 0, 0.06)");
+    context.fillStyle = surfGrad;
+    context.fillRect(-widthPx * 0.5, -heightPx * 0.5, widthPx, heightPx);
 
     context.restore();
   }
@@ -475,14 +635,18 @@ export function createGameScene({ canvas, courseLayout }) {
     const alongZ = segment.height >= segment.width;
     const lineLength = (alongZ ? segment.height : segment.width) * camera.zoom * 0.86;
     const dashOffset = -(timeMs * 0.055 * motionScale) % 42;
+    const pulse = 0.6 + 0.3 * Math.sin(timeMs * 0.003 * motionScale);
 
     context.save();
     context.translate(center.x, center.y);
     context.rotate(segment.angle || 0);
-    context.lineWidth = 2.1;
-    context.strokeStyle = "rgba(236, 247, 255, 0.35)";
-    context.setLineDash([18, 14]);
+
+    // Dashed center line
+    context.lineWidth = 2.2;
+    context.strokeStyle = `rgba(200, 220, 255, ${(0.25 + pulse * 0.15).toFixed(3)})`;
+    context.setLineDash([16, 12]);
     context.lineDashOffset = dashOffset;
+    context.lineCap = "round";
     context.beginPath();
     if (alongZ) {
       context.moveTo(0, -lineLength * 0.5);
@@ -492,7 +656,26 @@ export function createGameScene({ canvas, courseLayout }) {
       context.lineTo(lineLength * 0.5, 0);
     }
     context.stroke();
+
+    // Solid edge lines
+    const edgeSpan = (alongZ ? segment.width : segment.height) * camera.zoom * 0.44;
     context.setLineDash([]);
+    context.lineWidth = 1.2;
+    context.strokeStyle = `rgba(130, 180, 255, ${(0.15 + pulse * 0.1).toFixed(3)})`;
+    context.beginPath();
+    if (alongZ) {
+      context.moveTo(-edgeSpan, -lineLength * 0.5);
+      context.lineTo(-edgeSpan, lineLength * 0.5);
+      context.moveTo(edgeSpan, -lineLength * 0.5);
+      context.lineTo(edgeSpan, lineLength * 0.5);
+    } else {
+      context.moveTo(-lineLength * 0.5, -edgeSpan);
+      context.lineTo(lineLength * 0.5, -edgeSpan);
+      context.moveTo(-lineLength * 0.5, edgeSpan);
+      context.lineTo(lineLength * 0.5, edgeSpan);
+    }
+    context.stroke();
+
     context.restore();
   }
 
@@ -503,7 +686,7 @@ export function createGameScene({ canvas, courseLayout }) {
 
     const alongZ = segment.height >= segment.width;
     const span = alongZ ? segment.width : segment.height;
-    const curbWidth = clamp(span * 0.12, 0.25, 0.56);
+    const curbWidth = clamp(span * 0.1, 0.2, 0.48);
 
     if (span <= curbWidth * 2.2) {
       return;
@@ -514,9 +697,9 @@ export function createGameScene({ canvas, courseLayout }) {
       const localX = alongZ ? sideOffset * side : 0;
       const localZ = alongZ ? 0 : sideOffset * side;
       const center = offsetByLocal(segment.x, segment.z, segment.angle || 0, localX, localZ);
-      const pulse = 0.6 + 0.4 * Math.sin(timeMs * 0.004 * motionScale + side * 1.9 + segment.x * 0.07);
-      const brightness = Math.round(148 + pulse * 56);
+      const pulse = 0.5 + 0.5 * Math.sin(timeMs * 0.005 * motionScale + side * 2.1 + segment.x * 0.09);
 
+      // Neon curb strips
       drawWorldRect(
         {
           x: center.x,
@@ -526,67 +709,138 @@ export function createGameScene({ canvas, courseLayout }) {
           angle: segment.angle,
         },
         {
-          fill: `rgba(255, ${brightness}, 95, 0.34)`,
-          stroke: "rgba(255, 229, 188, 0.18)",
-          lineWidth: 1,
+          fill: `rgba(255, ${Math.round(120 + pulse * 80)}, 60, ${(0.35 + pulse * 0.2).toFixed(3)})`,
+          stroke: `rgba(255, 200, 120, ${(0.3 + pulse * 0.25).toFixed(3)})`,
+          lineWidth: 1.2,
+          edgeGlow: `rgba(255, 160, 60, 0.5)`,
+          edgeGlowAlpha: 0.08 + pulse * 0.08,
         }
       );
     }
   }
 
   function drawTrack(timeMs) {
-    for (const segment of staticRoad) {
+    const roads = staticRoad.filter(s => !s.guardrail);
+    const rails = staticRoad.filter(s => s.guardrail);
+
+    // Shadows for roads
+    for (const segment of roads) {
       drawWorldRect(segment, {
-        shadow: "rgba(0, 0, 0, 0.2)",
-        shadowOffsetY: 1.5,
+        shadow: "rgba(0, 0, 0, 0.3)",
+        shadowOffsetY: 3,
+        shadowOffsetX: 1.5,
       });
+    }
+
+    // Road surfaces
+    for (const segment of roads) {
+      // Choose edge glow color based on segment type
+      let glowColor = "rgba(100, 170, 255, 0.5)";
+      if (segment.id.includes("start")) glowColor = "rgba(80, 255, 160, 0.5)";
+      else if (segment.id.includes("finish")) glowColor = "rgba(255, 220, 80, 0.5)";
+      else if (segment.id.includes("checkpoint")) glowColor = "rgba(80, 180, 255, 0.6)";
+      else if (segment.id.includes("spinner") || segment.id.includes("arena")) glowColor = "rgba(80, 200, 120, 0.4)";
+      else if (segment.id.includes("zig")) glowColor = "rgba(120, 130, 255, 0.5)";
+      else if (segment.id.includes("split")) glowColor = "rgba(80, 220, 220, 0.5)";
 
       drawWorldRect(segment, {
         fill: segment.fill,
         stroke: segment.stroke,
-        lineWidth: 1.2,
+        lineWidth: 1.6,
+        edgeGlow: glowColor,
+        edgeGlowAlpha: 0.12,
+        radius: 3,
       });
 
+      drawRoadSurface(segment);
+    }
+
+    // Flow lines and curbs
+    for (const segment of roads) {
       drawFlowLine(segment, timeMs);
       drawSegmentCurbs(segment, timeMs);
     }
 
+    // Guardrails on top with neon glow
+    for (const rail of rails) {
+      const pulse = 0.5 + 0.5 * Math.sin(timeMs * 0.003 * motionScale + rail.x * 0.1 + rail.z * 0.05);
+
+      drawWorldRect(rail, {
+        shadow: "rgba(0, 0, 0, 0.2)",
+        shadowOffsetY: 2,
+      });
+
+      drawWorldRect(rail, {
+        fill: rail.fill,
+        stroke: `rgba(180, 220, 255, ${(0.3 + pulse * 0.15).toFixed(3)})`,
+        lineWidth: 1.5,
+        edgeGlow: "rgba(100, 180, 255, 0.7)",
+        edgeGlowAlpha: 0.1 + pulse * 0.06,
+        radius: 2,
+      });
+    }
+
+    // Ramps with special styling
     for (const ramp of ramps) {
       drawWorldRect(ramp, {
-        shadow: "rgba(0, 0, 0, 0.22)",
-        shadowOffsetY: 1.5,
+        shadow: "rgba(0, 0, 0, 0.28)",
+        shadowOffsetY: 2,
       });
       drawWorldRect(ramp, {
         fill: ramp.fill,
         stroke: ramp.stroke,
-        lineWidth: 1.1,
+        lineWidth: 1.4,
+        edgeGlow: "rgba(255, 200, 120, 0.6)",
+        edgeGlowAlpha: 0.12,
+        radius: 4,
       });
     }
 
-    const pulse = 0.58 + 0.42 * Math.sin(timeMs * 0.0042 * motionScale);
+    // Finish zone — neon ring with glow
+    const pulse = 0.5 + 0.5 * Math.sin(timeMs * 0.004 * motionScale);
     const finishCenter = worldToScreen(finishZone.x, finishZone.z);
     const outerRadius = finishZone.radius * camera.zoom;
 
     context.save();
-    context.strokeStyle = `rgba(255, 214, 120, ${(0.62 + pulse * 0.22).toFixed(3)})`;
+
+    // Outer glow
+    const glowGrad = context.createRadialGradient(
+      finishCenter.x, finishCenter.y, outerRadius * 0.5,
+      finishCenter.x, finishCenter.y, outerRadius + 20
+    );
+    glowGrad.addColorStop(0, `rgba(255, 200, 60, ${(0.08 + pulse * 0.12).toFixed(3)})`);
+    glowGrad.addColorStop(1, "rgba(255, 200, 60, 0)");
+    context.fillStyle = glowGrad;
+    context.beginPath();
+    context.arc(finishCenter.x, finishCenter.y, outerRadius + 20, 0, Math.PI * 2);
+    context.fill();
+
+    // Main ring
+    context.strokeStyle = `rgba(255, 220, 100, ${(0.7 + pulse * 0.25).toFixed(3)})`;
     context.lineWidth = 4;
+    context.shadowColor = "rgba(255, 200, 60, 0.6)";
+    context.shadowBlur = 12;
     context.beginPath();
     context.arc(finishCenter.x, finishCenter.y, outerRadius, 0, Math.PI * 2);
     context.stroke();
+    context.shadowBlur = 0;
 
-    context.strokeStyle = `rgba(255, 242, 192, ${(0.35 + pulse * 0.28).toFixed(3)})`;
-    context.lineWidth = 9;
-    context.setLineDash([17, 11]);
-    context.lineDashOffset = -(timeMs * 0.07 * motionScale) % 28;
+    // Animated dashed orbit
+    context.strokeStyle = `rgba(255, 240, 180, ${(0.4 + pulse * 0.3).toFixed(3)})`;
+    context.lineWidth = 7;
+    context.setLineDash([14, 10]);
+    context.lineDashOffset = -(timeMs * 0.08 * motionScale) % 24;
     context.beginPath();
-    context.arc(finishCenter.x, finishCenter.y, outerRadius + 7, 0, Math.PI * 2);
+    context.arc(finishCenter.x, finishCenter.y, outerRadius + 9, 0, Math.PI * 2);
     context.stroke();
     context.setLineDash([]);
 
-    context.fillStyle = `rgba(255, 229, 158, ${(0.14 + pulse * 0.19).toFixed(3)})`;
+    // Inner pulse fill
+    context.fillStyle = `rgba(255, 230, 140, ${(0.06 + pulse * 0.08).toFixed(3)})`;
     context.beginPath();
-    context.arc(finishCenter.x, finishCenter.y, outerRadius + 13, 0, Math.PI * 2);
+    context.arc(finishCenter.x, finishCenter.y, outerRadius * 0.9, 0, Math.PI * 2);
     context.fill();
+
     context.restore();
   }
 
@@ -689,9 +943,37 @@ export function createGameScene({ canvas, courseLayout }) {
   }
 
   function drawCar(timeMs) {
-    const center = worldToScreen(smoothedCar.x, smoothedCar.z);
     const carWidth = 1.9 * camera.zoom;
     const carLength = 3.2 * camera.zoom;
+    
+    // Draw trail
+    if (carTrail.length > 1) {
+      context.save();
+      context.beginPath();
+      for (let i = 0; i < carTrail.length; i++) {
+        const point = worldToScreen(carTrail[i].x, carTrail[i].z);
+        if (i === 0) context.moveTo(point.x, point.y);
+        else context.lineTo(point.x, point.y);
+      }
+      context.strokeStyle = `rgba(97, 209, 255, 0.4)`;
+      context.lineWidth = carWidth * 0.8;
+      context.lineCap = "round";
+      context.lineJoin = "round";
+      context.stroke();
+      context.restore();
+    }
+
+    // Draw particles
+    for (const p of carParticles) {
+      const pCenter = worldToScreen(p.x, p.z);
+      const alpha = Math.max(0, p.life / p.maxLife);
+      context.fillStyle = `rgba(255, 100, 0, ${alpha})`;
+      context.beginPath();
+      context.arc(pCenter.x, pCenter.y, p.radius * camera.zoom, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    const center = worldToScreen(smoothedCar.x, smoothedCar.z);
     const underGlow = 0.26 + 0.12 * Math.sin(timeMs * 0.0045 * motionScale);
 
     context.save();
@@ -812,11 +1094,33 @@ export function createGameScene({ canvas, courseLayout }) {
     // Round resets teleport the car; snap camera to avoid long cross-map interpolation.
     const teleportDistance = Math.hypot(targetCar.x - smoothedCar.x, targetCar.z - smoothedCar.z);
     if (teleportDistance > 32) {
+      screenShakeAmount = 25;
+      carTrail.length = 0; // Clear trails on teleport
       smoothedCar.x = targetCar.x;
       smoothedCar.z = targetCar.z;
       smoothedCar.angle = targetCar.angle;
       camera.x = targetCar.x;
       camera.z = targetCar.z;
+    } else if (teleportDistance > 0.5) {
+      // Light shake on collisions
+      const speedDiff = Math.hypot(targetCar.velocityX, targetCar.velocityZ);
+      if (speedDiff < 5 && screenShakeAmount < 2) {
+         screenShakeAmount = 5;
+      }
+    }
+
+    if (screenShakeAmount > 0) {
+      screenShakeAmount *= Math.exp(-8 * dt);
+      if (screenShakeAmount < 0.1) screenShakeAmount = 0;
+    }
+
+    // Compute shake offset once per frame (not per worldToScreen call)
+    if (screenShakeAmount > 0.1) {
+      shakeOffsetX = (Math.random() - 0.5) * screenShakeAmount;
+      shakeOffsetY = (Math.random() - 0.5) * screenShakeAmount;
+    } else {
+      shakeOffsetX = 0;
+      shakeOffsetY = 0;
     }
 
     smoothedCar.x += (targetCar.x - smoothedCar.x) * interpolation;
@@ -835,6 +1139,37 @@ export function createGameScene({ canvas, courseLayout }) {
     }
 
     const speed = Math.hypot(targetCar.velocityX, targetCar.velocityZ);
+
+    if (speed > 2) {
+       carTrail.push({x: smoothedCar.x, z: smoothedCar.z, angle: smoothedCar.angle, time: performance.now()});
+    }
+    while (carTrail.length > 0 && performance.now() - carTrail[0].time > 400) {
+       carTrail.shift();
+    }
+
+    if (speed > 10 && Math.random() < 0.3) {
+      const rearX = smoothedCar.x - Math.sin(smoothedCar.angle) * 1.5;
+      const rearZ = smoothedCar.z + Math.cos(smoothedCar.angle) * 1.5;
+      carParticles.push({
+         x: rearX + (Math.random() - 0.5),
+         z: rearZ + (Math.random() - 0.5),
+         vx: (Math.random() - 0.5) * 2,
+         vz: (Math.random() - 0.5) * 2,
+         life: 0.3,
+         maxLife: 0.3,
+         radius: 0.3 + Math.random() * 0.4
+      });
+    }
+    for (let i = carParticles.length - 1; i >= 0; i--) {
+      carParticles[i].life -= dt;
+      if (carParticles[i].life <= 0) {
+        carParticles.splice(i, 1);
+      } else {
+        carParticles[i].x += carParticles[i].vx * dt;
+        carParticles[i].z += carParticles[i].vz * dt;
+      }
+    }
+
     const desiredZoom = clamp(
       Math.min(viewport.width / 50, viewport.height / 34) - clamp(speed * 0.082, 0, 2.15),
       8.4,
